@@ -61,8 +61,5 @@ A comprehensive, real-time virtual trading platform designed to simulate the Ind
    ```
    The application will be accessible at `http://localhost:8080`.
 
-## 🤝 Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## 📜 License
 This project is licensed under the MIT License.
