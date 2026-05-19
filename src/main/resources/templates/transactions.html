@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+  <th:block th:replace="~{layout/base :: base('Transactions | StockSim', ~{::content}, ~{::scripts})}">
+    
+    <div th:fragment="content" class="page-container">
+      <div class="page-header">
+        <h1 class="page-title">Transaction History</h1>
+        <div class="page-subtitle">Your complete trading record</div>
+      </div>
+      
+      <div class="page-body">
+        
+        <div class="card anim-card p-0 overflow-hidden">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date & Time</th>
+                <th>Stock</th>
+                <th>Type</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total Value</th>
+                <th>Realized P&L</th>
+              </tr>
+            </thead>
+            <tbody id="tx-tbody">
+              <tr><td colspan="7" class="text-center py-5 text-muted"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+          
+          <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light bg-opacity-50">
+            <div class="text-muted" style="font-size:13px" id="page-info">Showing latest trades...</div>
+            <div class="btn-group">
+              <button class="btn btn-sm btn-outline-secondary" id="btn-prev" disabled>Previous</button>
+              <button class="btn btn-sm btn-outline-secondary" id="btn-next" disabled>Next</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <script th:fragment="scripts">
+      let currentPage = 0;
+      let totalPages = 1;
+
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelector('a[href="/transactions"]').classList.add('active');
+        loadTransactions(0);
+        
+        document.getElementById('btn-prev').onclick = () => {
+          if(currentPage > 0) loadTransactions(currentPage - 1);
+        };
+        document.getElementById('btn-next').onclick = () => {
+          if(currentPage < totalPages - 1) loadTransactions(currentPage + 1);
+        };
+      });
+
+      async function loadTransactions(page) {
+        try {
+          const res = await fetch(`/api/transactions?page=${page}&size=15`, { headers: authHeaders() });
+          const data = await res.json();
+          if(!data.success) return;
+          
+          const pageData = data.data;
+          currentPage = pageData.number;
+          totalPages = pageData.totalPages;
+          
+          document.getElementById('btn-prev').disabled = pageData.first;
+          document.getElementById('btn-next').disabled = pageData.last;
+          document.getElementById('page-info').textContent = `Page ${currentPage + 1} of ${totalPages || 1}`;
+          
+          const tbody = document.getElementById('tx-tbody');
+          if(pageData.content.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
+              No transactions found. <a href="/dashboard">Start trading →</a></td></tr>`;
+            return;
+          }
+          
+          tbody.innerHTML = pageData.content.map(tx => {
+            const isBuy = tx.type === 'BUY';
+            let pnlStr = '--';
+            if (!isBuy && tx.realizedPnl !== null) {
+              const pnl = tx.realizedPnl;
+              pnlStr = `<span class="${pnl >= 0 ? 'price-up' : 'price-down'}">${pnl >= 0 ? '+' : ''}${formatINR(pnl)}</span>`;
+            }
+            
+            return `
+              <tr>
+                <td style="font-size:13px">${tx.formattedDate}</td>
+                <td>
+                  <a href="/stocks/${tx.id}" style="text-decoration:none;font-weight:600;color:var(--text-primary)">
+                  ${tx.symbol}
+                  </a>
+                </td>
+                <td>
+                  <span class="badge ${isBuy ? 'bg-success bg-opacity-10 text-success' : 'bg-danger bg-opacity-10 text-danger'}" 
+                        style="padding:6px 10px;font-size:11px">
+                    ${tx.type}
+                  </span>
+                </td>
+                <td class="mono">${tx.quantity}</td>
+                <td class="mono">${formatINR(tx.price)}</td>
+                <td class="mono" style="font-weight:600">${formatINR(tx.totalAmount)}</td>
+                <td class="mono">${pnlStr}</td>
+              </tr>
+            `;
+          }).join('');
+        } catch(e) {}
+      }
+    </script>
+    
+  </th:block>
+</body>
+</html>

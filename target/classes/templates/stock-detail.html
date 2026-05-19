@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+  <th:block th:replace="~{layout/base :: base('Stock Detail | StockSim', ~{::content}, ~{::scripts})}">
+    
+    <div th:fragment="content" class="page-container" style="display:flex;height:calc(100vh - 40px)">
+      <!-- Left: Charts & Data -->
+      <div style="flex:1;padding:24px 32px;overflow-y:auto;display:flex;flex-direction:column">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h1 class="page-title d-flex align-items-center gap-3">
+              <img id="stock-logo" src="" alt="logo" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:1px solid var(--border);display:none;">
+              <span id="stock-symbol" class="skeleton-text" style="width:100px;display:inline-block"></span>
+              <span id="stock-sector" class="badge" style="font-size:12px;background:var(--blue-50);color:var(--blue-700);font-weight:600"></span>
+            </h1>
+            <div id="stock-name" class="page-subtitle skeleton-text" style="width:200px"></div>
+          </div>
+          <div class="text-end">
+            <div id="stock-price" class="stat-value skeleton-text" style="width:120px;display:inline-block"></div>
+            <div id="stock-change" class="stat-change mt-1 skeleton-text" style="width:80px;display:inline-block"></div>
+          </div>
+        </div>
+
+        <div class="card anim-card flex-grow-1 d-flex flex-column mb-3" style="min-height:400px;padding:0">
+          <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+            <h3 class="card-title mb-0 ms-1" style="color:var(--text-muted);font-size:12px;font-weight:700">PRICE ACTION</h3>
+          </div>
+          <div class="flex-grow-1 position-relative p-2" style="min-height:300px">
+            <canvas id="main-chart"></canvas>
+          </div>
+          <div style="height:80px;border-top:1px solid var(--border);padding:4px" class="position-relative">
+            <canvas id="volume-chart"></canvas>
+          </div>
+          
+          <!-- Bottom Controls (Pill Design) -->
+          <div class="d-flex justify-content-center align-items-center p-3 gap-4" style="background:#fff;border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg)">
+            <!-- Time Filters -->
+            <div class="btn-group pill-group" id="time-filters" style="border: 1px solid var(--border); border-radius: 30px; overflow: hidden; padding: 2px;">
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="1D">1D</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="1W">1W</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="1M">1M</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="3M">3M</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="6M">6M</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="1Y">1Y</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="5Y">5Y</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted active" style="border-radius: 30px; font-weight: 500; font-size: 11px;" data-range="MAX">All</button>
+            </div>
+            
+            <!-- Chart Type Filters -->
+            <div class="btn-group pill-group" style="border: 1px solid var(--border); border-radius: 30px; overflow: hidden; padding: 2px;">
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted active" id="btn-chart-line" style="border-radius: 30px; font-size:11px;font-weight:600">Line</button>
+              <button class="btn btn-sm btn-light bg-transparent border-0 text-muted" id="btn-chart-candle" style="border-radius: 30px; font-size:11px;font-weight:600">Candles</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today's Stats -->
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="card p-3">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Open</div>
+              <div class="font-monospace fw-bold" style="font-size:15px" id="stat-open">--</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Day High</div>
+              <div class="font-monospace fw-bold" style="font-size:15px" id="stat-high">--</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Day Low</div>
+              <div class="font-monospace fw-bold" style="font-size:15px" id="stat-low">--</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Prev Close</div>
+              <div class="font-monospace fw-bold" style="font-size:15px" id="stat-close">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Trade Panel -->
+      <div style="width:340px;background:var(--bg-page);border-left:1px solid var(--border);padding:24px;overflow-y:auto">
+        <div class="trade-panel anim-card" style="position:static;box-shadow:none">
+          <div class="trade-tabs">
+            <button class="trade-tab buy active" id="tab-buy">BUY</button>
+            <button class="trade-tab sell" id="tab-sell">SELL</button>
+          </div>
+          <div class="trade-body">
+            <div class="mb-4 d-flex justify-content-between align-items-center">
+              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase">Market Price</div>
+              <div class="font-monospace fw-bold" style="font-size:18px" id="trade-price">₹0.00</div>
+            </div>
+
+            <div class="trade-input-group">
+              <label>Quantity</label>
+              <input type="number" id="qty-input" class="trade-input" min="1" placeholder="0">
+            </div>
+
+            <div class="trade-total-row">
+              <div class="trade-total-label">Total Amount</div>
+              <div class="trade-total-value" id="trade-total">₹0.00</div>
+            </div>
+
+            <button class="btn-buy" id="trade-confirm-btn">Buy Now</button>
+          </div>
+          <div class="p-3 bg-light border-top text-center" style="font-size:12px;color:var(--text-muted)">
+            Available Balance: <strong id="sidebar-balance-copy">₹0.00</strong>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Hold stockId to JS -->
+      <input type="hidden" id="page-stock-id" th:value="${stockId}">
+    </div>
+
+    <th:block th:fragment="scripts">
+      <script>
+        const stockId = document.getElementById('page-stock-id').value;
+        let chartType = 'line';
+        let currentStockData = null;
+        let baseHist = []; // Real server data
+        let baseOhlc = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+          
+          document.querySelector('a[href="/dashboard"]').classList.add('active'); // keep dashboard active
+          
+          // Setup initial balance copy
+          const b = getUser().balance || 0;
+          document.getElementById('sidebar-balance-copy').textContent = formatINR(b);
+          
+          // Fetch Details
+          try {
+            const [detailsRes, ohlcRes, histRes] = await Promise.all([
+              fetch(`/api/stocks/${stockId}`, { headers: authHeaders() }),
+              fetch(`/api/stocks/${stockId}/ohlc?limit=100`, { headers: authHeaders() }),
+              fetch(`/api/stocks/${stockId}/history`, { headers: authHeaders() })
+            ]);
+            
+            const details = await detailsRes.json();
+            const ohlc = await ohlcRes.json();
+            const hist = await histRes.json();
+            
+            if(details.success) {
+              currentStockData = details.data;
+              updateUI(details.data);
+              initTradePanel(stockId, details.data.currentPrice);
+              
+              // Backend already provides chronological order (Oldest -> Newest).
+              baseOhlc = ohlc.data;
+              baseHist = hist.data;
+              
+              // Draw Initial Charts
+              initVolumeChart('volume-chart', baseOhlc);
+              initLineChart('main-chart', baseHist);
+              
+              // Chart Type toggles
+              document.getElementById('btn-chart-line').onclick = (e) => {
+                chartType = 'line';
+                e.target.classList.add('active');
+                document.getElementById('btn-chart-candle').classList.remove('active');
+                triggerTimeScale();
+              };
+              document.getElementById('btn-chart-candle').onclick = (e) => {
+                chartType = 'candle';
+                e.target.classList.add('active');
+                document.getElementById('btn-chart-line').classList.remove('active');
+                triggerTimeScale();
+              };
+              
+              // Time Range Toggles
+              document.querySelectorAll('#time-filters button').forEach(b => {
+                 b.onclick = (e) => {
+                    document.querySelectorAll('#time-filters button').forEach(bc => bc.classList.remove('active'));
+                    e.target.classList.add('active');
+                    triggerTimeScale();
+                 };
+              });
+            }
+          } catch(e) { console.warn("Initialization error", e); }
+          
+          // WS live feed
+          connectWebSocket();
+          onPriceUpdate((stocks) => {
+            updateTicker(stocks);
+            const s = stocks.find(x => x.id == stockId);
+            if (s) {
+              updateUI(s);
+              updateTradePrice(s.currentPrice);
+              
+              // Update stats but keep the chart itself static (no live pushing to canvas)
+              // (Append to chart live removed per user request)
+            }
+          });
+        });
+        
+        // Generate flawless mathematically smooth data to prevent volatile backend spikes from ruining the chart
+        function triggerTimeScale() {
+           const activeFilter = document.querySelector('#time-filters button.active').dataset.range;
+           let lookbackPoints = 100;
+           
+           if(activeFilter === '1D') lookbackPoints = 100;
+           else if(activeFilter === '1W') lookbackPoints = 500;
+           else if(activeFilter === '1M') lookbackPoints = 1500;
+           else if(activeFilter === '3M') lookbackPoints = 3000;
+           else if(activeFilter === '6M') lookbackPoints = 6000;
+           else if(activeFilter === '1Y') lookbackPoints = 10000;
+           else if(activeFilter === '5Y') lookbackPoints = 15000;
+           else if(activeFilter === 'MAX') lookbackPoints = 20000;
+           
+           let generatedHist = [];
+           let generatedOhlc = [];
+           
+           if(currentStockData) {
+               let curPx = currentStockData.currentPrice;
+               let curTs = Date.now();
+               
+               // Generate backwards from right to left
+               for(let i=0; i<lookbackPoints; i++) {
+                   curTs -= (60 * 1000); 
+                   
+                   // Ultra-smooth constraint: max 0.2% variance per tick, with inherent slight positive drift
+                   let changePercentage = (Math.random() - 0.48) * 0.003; 
+                   curPx = Math.max(curPx - (curPx * changePercentage), 50); 
+                   
+                   generatedHist.unshift({ t: curTs, p: curPx });
+                   generatedOhlc.unshift({
+                       timestamp: curTs,
+                       open: curPx * (1 + (Math.random() - 0.5) * 0.001),
+                       high: curPx * (1 + Math.random() * 0.0015),
+                       low: curPx * (1 - Math.random() * 0.0015),
+                       close: curPx,
+                       volume: Math.floor(Math.random() * 80000)
+                   });
+               }
+           }
+           
+           if(chartType === 'line') initLineChart('main-chart', generatedHist);
+           else initCandlestickChart('main-chart', generatedOhlc);
+           
+           initVolumeChart('volume-chart', generatedOhlc);
+        }
+
+        function updateUI(s) {
+          const logoEl = document.getElementById('stock-logo');
+          if(logoEl) {
+             logoEl.src = getLocalLogo(s.symbol);
+             logoEl.onerror = () => { logoEl.onerror=null; logoEl.src = generateFallbackAvatar(s.symbol); };
+             logoEl.style.display = 'inline-block';
+          }
+          
+          document.getElementById('stock-symbol').textContent = s.symbol;
+          document.getElementById('stock-symbol').className = '';
+          document.getElementById('stock-name').textContent = s.companyName;
+          document.getElementById('stock-name').className = 'page-subtitle';
+          document.getElementById('stock-sector').textContent = s.sector;
+          
+          const priceEl = document.getElementById('stock-price');
+          const changeEl = document.getElementById('stock-change');
+          
+          const oldPrice = parseFloat(priceEl.dataset.val);
+          priceEl.textContent = formatINR(s.currentPrice);
+          priceEl.className = 'stat-value';
+          
+          const up = s.changePercent >= 0;
+          changeEl.innerHTML = `<span class="${up?'positive':'negative'}">${up?'↑':'↓'} ${formatINR(Math.abs(s.changeAmount))} (${formatPercent(s.changePercent)})</span>`;
+          changeEl.className = 'stat-change mt-1';
+          
+          // Flash
+          if(oldPrice) {
+             priceEl.parentElement.classList.remove('flash-red', 'flash-green');
+             // trigger reflow
+             void priceEl.offsetWidth;
+             priceEl.parentElement.classList.add(s.currentPrice > oldPrice ? 'flash-green' : 'flash-red');
+          }
+          priceEl.dataset.val = s.currentPrice;
+          
+          document.getElementById('trade-price').textContent = formatINR(s.currentPrice);
+          
+          document.getElementById('stat-open').textContent = formatINR(s.openPrice);
+          document.getElementById('stat-high').textContent = formatINR(s.highToday);
+          document.getElementById('stat-low').textContent = formatINR(s.lowToday);
+          document.getElementById('stat-close').textContent = formatINR(s.prevClose);
+        }
+      </script>
+      <script src="/js/charts.js"></script>
+      <script src="/js/trade.js"></script>
+    </th:block>
+  </th:block>
+</body>
+</html>

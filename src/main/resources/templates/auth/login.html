@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login | StockSim India</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+  <style>
+    #anime-canvas { position:absolute; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+    .auth-left { position:relative; z-index:1; background:transparent !important; overflow: hidden; }
+    .petal { position:absolute; top:-20px; pointer-events:none; z-index:0; animation:fall linear infinite; opacity:0; }
+    @keyframes fall {
+      0%   { transform:translateY(-20px) rotate(0deg) translateX(0); opacity:0; }
+      10%  { opacity:0.85; }
+      90%  { opacity:0.6; }
+      100% { transform:translateY(110vh) rotate(720deg) translateX(60px); opacity:0; }
+    }
+    .orb { position:absolute; border-radius:50%; filter:blur(70px); pointer-events:none; z-index:0; animation:orb-float ease-in-out infinite alternate; }
+    @keyframes orb-float {
+      0%   { transform:translateY(0) scale(1); opacity:0.3; }
+      100% { transform:translateY(-50px) scale(1.2); opacity:0.5; }
+    }
+    .scanlines { position:absolute; top:0; left:0; width:100%; height:100%; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px); z-index:1; pointer-events:none; }
+    .brand-logo-img { width:96px; height:96px; object-fit:contain; margin-bottom:20px; border-radius:20px; transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1), filter 0.35s ease; filter:drop-shadow(0 4px 16px rgba(34,197,94,0.25)); cursor:pointer; position:relative; z-index:2; }
+    .brand-logo-img:hover { transform:scale(1.12) rotate(-2deg); filter:drop-shadow(0 8px 32px rgba(34,197,94,0.55)) brightness(1.08); }
+    .auth-brand-name, .auth-brand-tag, .auth-features, .auth-feature { position:relative; z-index:2; }
+  </style>
+</head>
+<body>
+
+  <div class="auth-wrapper">
+    <!-- Left Hero -->
+    <div class="auth-left">
+      <!-- Anime Background Canvas -->
+      <canvas id="anime-canvas"></canvas>
+      <div class="scanlines"></div>
+
+      <img src="/assets/logo.png" alt="StockSim Logo" class="brand-logo-img">
+      <h1 class="auth-brand-name">StockSim India</h1>
+      <div class="auth-brand-tag">Risk-Free Market Simulation</div>
+      
+      <div class="auth-features">
+        <div class="auth-feature">
+          <div class="auth-feature-icon">₹</div>
+          <span>Start with ₹1,00,000 virtual cash</span>
+        </div>
+        <div class="auth-feature">
+          <div class="auth-feature-icon">⚡</div>
+          <span>Real-time prices every 5 seconds</span>
+        </div>
+        <div class="auth-feature">
+          <div class="auth-feature-icon">🏅</div>
+          <span>Unlock achievements and badges</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Form -->
+    <div class="auth-right">
+      <div class="auth-card anim-card">
+        <h2 class="auth-title">Welcome back</h2>
+        <p class="auth-subtitle">Login to your trading account</p>
+        
+        <form id="login-form">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="email" class="form-control" placeholder="name@example.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+          </div>
+          <button type="submit" id="submit-btn" class="btn-auth">Login</button>
+        </form>
+        
+        <div class="auth-link">
+          Don't have an account? <a href="/auth/register">Create one</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', redirectIfAuth);
+    
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      setLoading(btn, true);
+      
+      const payload = {
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value
+      };
+      
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          setToken(data.data.token);
+          setUser({ username: data.data.username, email: data.data.email, balance: data.data.balance, userId: data.data.userId });
+          window.location.href = '/dashboard';
+        } else {
+          showToast(data.message || 'Login failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+  </script>
+
+  <!-- Anime Background Logic -->
+  <script>
+    const canvas = document.getElementById('anime-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Resize handler
+    function resizeCanvas() {
+      const leftPanel = document.querySelector('.auth-left');
+      if (leftPanel) {
+        canvas.width = leftPanel.clientWidth;
+        canvas.height = leftPanel.clientHeight;
+      }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const particles = [];
+    
+    // Sakura petals setup
+    const petalColors = ['#f472b6', '#fbcfe8', '#db2777', '#fb7185'];
+    
+    class Particle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * -canvas.height;
+        this.size = Math.random() * 5 + 3;
+        this.speedY = Math.random() * 1.5 + 0.5;
+        this.speedX = Math.random() * 2 - 1;
+        this.angle = Math.random() * 360;
+        this.spin = (Math.random() - 0.5) * 5;
+        this.color = petalColors[Math.floor(Math.random() * petalColors.length)];
+        this.opacity = Math.random() * 0.5 + 0.2;
+      }
+
+      update() {
+        this.y += this.speedY;
+        this.x += this.speedX + Math.sin(this.angle * Math.PI / 180) * 0.5;
+        this.angle += this.spin;
+
+        if (this.y > canvas.height + 20) {
+          this.reset();
+        }
+      }
+
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle * Math.PI / 180);
+        ctx.globalAlpha = this.opacity;
+        ctx.fillStyle = this.color;
+        
+        ctx.beginPath();
+        ctx.moveTo(0, -this.size/2);
+        ctx.quadraticCurveTo(this.size/2, -this.size/2, this.size/2, 0);
+        ctx.quadraticCurveTo(this.size/2, this.size/2, 0, this.size/2);
+        ctx.quadraticCurveTo(-this.size/2, this.size/2, -this.size/2, 0);
+        ctx.quadraticCurveTo(-this.size/2, -this.size/2, 0, -this.size/2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Initialize particles
+    for (let i = 0; i < 40; i++) {
+        particles.push(new Particle());
+    }
+
+    // Glowing orbs
+    const orbs = [];
+    const orbColors = ['rgba(34, 197, 94, 0.4)', 'rgba(56, 189, 248, 0.3)', 'rgba(139, 92, 246, 0.3)'];
+    
+    for(let i=0; i<3; i++) {
+        orbs.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            radius: Math.random() * 80 + 60,
+            color: orbColors[i],
+            speedY: (Math.random() - 0.5) * 0.5
+        })
+    }
+
+    function drawOrbs() {
+        orbs.forEach(orb => {
+            orb.y += orb.speedY;
+            if(orb.y < -100 || orb.y > canvas.height + 100) orb.speedY *= -1;
+            
+            ctx.beginPath();
+            const gradient = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.radius);
+            gradient.addColorStop(0, orb.color);
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw background gradient
+      const bgGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      bgGradient.addColorStop(0, '#0f172a');
+      bgGradient.addColorStop(1, '#1e293b');
+      ctx.fillStyle = bgGradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      drawOrbs();
+
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+
+      requestAnimationFrame(animate);
+    }
+    
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+  <th:block th:replace="~{layout/base :: base('Dashboard | StockSim', ~{::content}, ~{::scripts})}">
+    
+    <div th:fragment="content" class="page-container">
+      <div class="page-header">
+        <h1 class="page-title">Market Overview</h1>
+        <div class="page-subtitle">Real-time quotes for top NSE stocks</div>
+      </div>
+      
+      <div class="page-body">
+        
+        <!-- Search -->
+        <div class="card mb-4 anim-card" style="padding:16px 20px">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-search text-muted me-3" style="font-size:20px"></i>
+            <input type="text" id="search-input" class="form-control border-0 bg-transparent shadow-none px-0" 
+                   style="font-size:16px" placeholder="Search stocks by symbol or company name...">
+          </div>
+        </div>
+
+        <!-- Stocks Table -->
+        <div class="card anim-card p-0 overflow-hidden">
+          <table class="data-table" style="table-layout:fixed;width:100%">
+            <thead>
+              <tr>
+                <th style="width:16%">Symbol</th>
+                <th style="width:20%">Company Name</th>
+                <th style="width:9%">Sector</th>
+                <th class="text-end" style="width:13%">LTP (₹)</th>
+                <th class="text-end" style="width:20%">Change</th>
+                <th class="text-end" style="width:10%">Volume</th>
+                <th class="text-center" style="width:12%">Action</th>
+              </tr>
+            </thead>
+            <tbody id="stocks-tbody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+          
+          <div id="loading-state" class="text-center py-5 text-muted">
+            <span class="spinner mb-2 border-primary border-top-transparent"></span><br>
+            Loading market data...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script th:fragment="scripts">
+      document.addEventListener('DOMContentLoaded', async () => {
+        
+        document.querySelector('a[href="/dashboard"]').classList.add('active');
+        
+        // Load initial stocks
+        try {
+          const res = await fetch('/api/stocks', { headers: authHeaders() });
+          const data = await res.json();
+          if (data.success) {
+            initTicker(data.data);
+            renderStocks(data.data);
+            document.getElementById('loading-state').style.display = 'none';
+          }
+        } catch(e) { }
+
+        // Setup Search
+        document.getElementById('search-input').addEventListener('input', async (e) => {
+          const q = e.target.value.trim();
+          const url = q ? `/api/stocks/search?q=${encodeURIComponent(q)}` : '/api/stocks';
+          try {
+            const res = await fetch(url, { headers: authHeaders() });
+            const data = await res.json();
+            if (data.success) renderStocks(data.data);
+          } catch(err) {}
+        });
+
+        // Setup WebSocket for Live Updates
+        connectWebSocket();
+        onPriceUpdate((stocks) => {
+          updateTicker(stocks);
+          stocks.forEach(s => {
+            const row = document.getElementById(`stock-row-${s.id}`);
+            if (row) {
+              const priceCell = row.querySelector('.col-price');
+              const changeCell = row.querySelector('.col-change');
+              const volCell = row.querySelector('.col-vol');
+              
+              const oldPrice = parseFloat(priceCell.dataset.val);
+              
+              priceCell.textContent = formatINR(s.currentPrice);
+              volCell.textContent = s.volume >= 1e6 ? (s.volume/1e6).toFixed(1)+'M' : (s.volume/1e3).toFixed(1)+'K';
+              
+              const up = s.changePercent >= 0;
+              changeCell.innerHTML = `
+                <span class="${up ? 'price-up' : 'price-down'}">${formatINR(s.changeAmount)}</span>
+                <span class="badge-${up ? 'up' : 'down'} ms-1">${formatPercent(s.changePercent)}</span>
+              `;
+              
+              if (s.currentPrice > oldPrice) {
+                row.classList.remove('flash-red'); row.classList.add('flash-green');
+              } else if (s.currentPrice < oldPrice) {
+                row.classList.remove('flash-green'); row.classList.add('flash-red');
+              }
+              setTimeout(() => { row.classList.remove('flash-green', 'flash-red'); }, 800);
+              priceCell.dataset.val = s.currentPrice;
+            }
+          });
+        });
+      });
+
+      function renderStocks(stocks) {
+        const tbody = document.getElementById('stocks-tbody');
+        tbody.innerHTML = stocks.map(s => {
+          const up = s.changePercent >= 0;
+          const logoSrc = getLocalLogo(s.symbol);
+          const fallback = `generateFallbackAvatar('${s.symbol}')`;
+          return `
+            <tr id="stock-row-${s.id}">
+              <td>
+                <div class="stock-symbol-cell">
+                  <img src="${logoSrc}" alt="${s.symbol}" loading="lazy" onerror="this.onerror=null;this.src=${fallback}">
+                  <a href="/stocks/${s.id}">${s.symbol}</a>
+                </div>
+              </td>
+              <td style="color:var(--text-muted);font-size:12.5px">${s.companyName}</td>
+              <td><span style="background:var(--blue-50);color:var(--blue-700);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${s.sector}</span></td>
+              <td class="text-end mono col-price" data-val="${s.currentPrice}" style="font-weight:700;font-family:var(--font-mono)">${formatINR(s.currentPrice)}</td>
+              <td class="text-end col-change">
+                <span class="${up ? 'price-up' : 'price-down'}">${formatINR(s.changeAmount)}</span>
+                <span class="badge-${up ? 'up' : 'down'} ms-1">${formatPercent(s.changePercent)}</span>
+              </td>
+              <td class="text-end mono text-muted col-vol" style="font-size:12px">
+                ${s.volume >= 1e6 ? (s.volume/1e6).toFixed(1)+'M' : (s.volume/1e3).toFixed(1)+'K'}
+              </td>
+              <td class="text-center">
+                <a href="/stocks/${s.id}" class="btn-outline" style="padding:4px 12px;font-size:11.5px;text-decoration:none;border-width:1.5px">Trade</a>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    </script>
+  </th:block>
+</body>
+</html>

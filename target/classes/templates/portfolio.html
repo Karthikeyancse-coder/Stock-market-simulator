@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+  <th:block th:replace="~{layout/base :: base('Portfolio | StockSim', ~{::content}, ~{::scripts})}">
+    
+    <div th:fragment="content" class="page-container">
+      <div class="page-header">
+        <h1 class="page-title">My Portfolio</h1>
+        <div class="page-subtitle">Track your holdings and performance</div>
+      </div>
+      
+      <div class="page-body">
+        
+        <!-- Summary Cards -->
+        <div class="row g-4 mb-4">
+          <div class="col-md-3">
+            <div class="card p-4 anim-card h-100">
+              <div class="card-title">Available Cash</div>
+              <div class="stat-value text-primary" id="cash-balance">--</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-4 anim-card h-100">
+              <div class="card-title">Total Invested</div>
+              <div class="stat-value" id="total-invested">--</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-4 anim-card h-100">
+              <div class="card-title">Current Value</div>
+              <div class="stat-value" id="current-value">--</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-4 anim-card h-100 dark-bg" style="background:var(--blue-900);border:var(--blue-900)">
+              <div class="card-title" style="color:var(--blue-300)">Total Returns</div>
+              <div class="stat-value text-white d-flex align-items-center gap-2">
+                <span id="total-pnl">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart and Table Row -->
+        <div class="row g-4 mb-4">
+          <div class="col-12">
+            <div class="card anim-card">
+              <div class="d-flex justify-content-between p-4 border-bottom">
+                <h3 class="card-title m-0">Portfolio Performance</h3>
+              </div>
+              <div style="height:300px;padding:16px;">
+                <canvas id="portfolio-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Holdings Table -->
+        <div class="card anim-card p-0 overflow-hidden">
+          <div class="p-4 border-bottom bg-light bg-opacity-50">
+            <h3 class="card-title m-0">Current Holdings</h3>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Stock</th>
+                <th>Qty</th>
+                <th>Avg. Price</th>
+                <th>LTP</th>
+                <th>Current Value</th>
+                <th>Unrealized P&L</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="holdings-tbody">
+              <tr><td colspan="7" class="text-center py-5 text-muted"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <th:block th:fragment="scripts">
+      <script>
+        document.addEventListener('DOMContentLoaded', () => {
+          document.querySelector('a[href="/portfolio"]').classList.add('active');
+          loadPortfolio();
+          
+          // WS live feed to refresh portfolio values
+          connectWebSocket();
+          let updateTimer;
+          onPriceUpdate(() => {
+            clearTimeout(updateTimer);
+            updateTimer = setTimeout(() => {
+               loadPortfolio(); // refresh portfolio every price tick
+               // Note: in a real app, we'd update DOM nodes directly instead of remaking the layout,
+               // but for this sim, the frequency is low enough
+            }, Math.random() * 500 + 500); 
+          });
+        });
+      </script>
+      <script src="/js/portfolio.js"></script>
+    </th:block>
+    
+  </th:block>
+</body>
+</html>
